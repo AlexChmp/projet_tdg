@@ -1,0 +1,7 @@
+digraph trophic_network {
+    "Tigre" -> "Cerf" [label="0.8"];
+    "Tigre" -> "Singe" [label="0.2"];
+    "Singe" -> "Serpent" [label="1.0"];
+    "Serpent" -> "Grenouille" [label="1.0"];
+    "Grenouille" -> "Insecte" [label="1.0"];
+}
