@@ -1,0 +1,22 @@
+graph trophic_network {
+    "Requin" -- "Thon";
+    "Requin" -- "Phoque";
+    "Thon" -- "Calmar";
+    "Thon" -- "Hareng";
+    "Calmar" -- "Hareng";
+    "Calmar" -- "Pieuvre";
+    "Hareng" -- "Plancton";
+    "Plancton" -- "Algues";
+    "Phoque" -- "Requin";
+    "Phoque" -- "Thon";
+    "Meduse" -- "Hareng";
+    "Meduse" -- "Plancton";
+    "Algues" -- "Meduse";
+    "Algues" -- "Crabe";
+    "Algues" -- "Crevette";
+    "Crabe" -- "Dauphin";
+    "Dauphin" -- "Thon";
+    "Dauphin" -- "Pieuvre";
+    "Pieuvre" -- "Crabe";
+    "Pieuvre" -- "Crevette";
+}
