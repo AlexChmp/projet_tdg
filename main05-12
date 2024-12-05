@@ -1,0 +1,385 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define taille 20
+
+typedef struct {
+    float populations[100];       // Populations actuelles
+    float growth_rates[100];      // Taux de croissance des espèces
+    float carrying_capacities[100]; // Capacités de charge
+} PopulationData;
+
+void initialize_population_data(int n, PopulationData *pop_data) {
+    for (int i = 0; i < n; i++) {
+        pop_data->populations[i] = (rand() % 50) + 50; // Population initiale entre 50 et 100
+        pop_data->growth_rates[i] = (rand() % 5 + 1) / 10.0; // Taux de croissance entre 0.1 et 0.5
+        pop_data->carrying_capacities[i] = (rand() % 200) + 100; // Capacité de charge entre 100 et 300
+    }
+}
+
+// Fonction pour lire le graph depuis un fichier
+void lecturetxt(const char *filename, int *n, char especes[][taille], double matriceajd[][100]) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Erreur lors de l'ouverture du fichier");
+        exit(EXIT_FAILURE);
+    }
+
+    fscanf(file, "%d", n); // Lire le nombre d'espèces
+
+    // Lire les noms des espèces
+    for (int i = 0; i < *n; i++) {
+        fscanf(file, "%s", especes[i]);
+    }
+
+    // Lire la matrice d'adjacence avec les poids
+    for (int i = 0; i < *n; i++) {
+        for (int j = 0; j < *n; j++) {
+            fscanf(file, "%lf", &matriceajd[i][j]);
+        }
+    }
+
+    fclose(file);
+}
+
+void update_population_dynamics(
+        int n,
+        double adjacency_matrix[][100],
+        char species[][taille],
+        PopulationData *pop_data,
+        int iterations
+) {
+    float new_populations[100];
+
+    for (int t = 0; t < iterations; t++) {
+        printf("\nIteration %d:\n", t + 1);
+        for (int i = 0; i < n; i++) {
+            float adjusted_capacity = pop_data->carrying_capacities[i];
+
+            // Contribution des autres espèces à la capacité de charge
+            for (int j = 0; j < n; j++) {
+                if (adjacency_matrix[j][i] > 0) {
+                    adjusted_capacity += adjacency_matrix[j][i] * pop_data->populations[j];
+                }
+            }
+
+            // Éviter des ajustements nuls ou négatifs
+            if (adjusted_capacity <= 0) {
+                adjusted_capacity = 1; // Valeur minimale pour éviter les divisions par zéro
+            }
+
+            // Calcul de la nouvelle population (corrigé)
+            new_populations[i] = pop_data->populations[i] +
+                                 pop_data->growth_rates[i] * pop_data->populations[i] *
+                                 (1 - pop_data->populations[i] / adjusted_capacity);
+
+            // Impact des autres espèces (modéré)
+            for (int j = 0; j < n; j++) {
+                if (adjacency_matrix[i][j] > 0) {
+                    new_populations[i] -= adjacency_matrix[i][j] * pop_data->populations[j] * 0.1; // Réduction modérée
+                }
+            }
+
+            // Protéger contre les valeurs négatives
+            if (new_populations[i] < 0) {
+                new_populations[i] = 0;
+            }
+        }
+
+        // Mise à jour des populations
+        for (int i = 0; i < n; i++) {
+            pop_data->populations[i] = new_populations[i];
+            printf("%s: %.0f\n", species[i], pop_data->populations[i]);
+        }
+    }
+}
+
+
+// Fonction pour rechercher un animal et afficher ce qu'il mange et ce qui le mange
+void rechercher_animal(int n, char especes[][taille], double matriceajd[][100]) {
+    char animal[taille];
+    printf("Entrez le nom de l'animal a interroger : ");
+    scanf("%s", animal);
+
+    // Trouver l'index de l'animal
+    int index = -1;
+    for (int i = 0; i < n; i++) {
+        if (strcmp(especes[i], animal) == 0) {
+            index = i;
+            break;
+        }
+    }
+
+    if (index == -1) {
+        printf("Animal non trouve dans le reseau.\n");
+        return;
+    }
+
+    // Afficher ce qu'il mange (successeurs)
+    printf("%s mange : ", animal);
+    int has_prey = 0;
+    for (int j = 0; j < n; j++) {
+        if (matriceajd[index][j] > 0) {
+            printf("%s (poids: %.1f) ", especes[j], matriceajd[index][j]);
+            has_prey = 1;
+        }
+    }
+    if (!has_prey) {
+        printf("Rien");
+    }
+    printf("\n");
+
+    // Afficher ce qui le mange (prédécesseurs)
+    printf("Les animaux qui mangent %s : ", animal);
+    int has_predators = 0;
+    for (int i = 0; i < n; i++) {
+        if (matriceajd[i][index] > 0) {
+            printf("%s (poids: %.1f) ", especes[i], matriceajd[i][index]);
+            has_predators = 1;
+        }
+    }
+    if (!has_predators) {
+        printf("Rien");
+    }
+    printf("\n");
+}
+
+void dfs(int v, int n, int visited[], double matriceajd[][100], int transpose) {
+    visited[v] = 1;
+    for (int i = 0; i < n; i++) {
+        if (!transpose) {
+            if (matriceajd[v][i] > 0 && !visited[i]) {
+                dfs(i, n, visited, matriceajd, 0);
+            }
+        } else {
+            if (matriceajd[i][v] > 0 && !visited[i]) {
+                dfs(i, n, visited, matriceajd, 1);
+            }
+        }
+    }
+}
+
+int est_fortement_connexe(int n, double matriceajd[][100]) {
+    int visited[100] = {0};
+
+    // Étape 1 : Vérifier la connexité depuis le sommet 0
+    dfs(0, n, visited, matriceajd, 0);
+    for (int i = 0; i < n; i++) {
+        if (!visited[i]) {
+            return 0; // Non fortement connexe
+        }
+    }
+
+    // Étape 2 : Transposer le graphe et vérifier à nouveau
+    memset(visited, 0, sizeof(visited)); // Réinitialiser "visited"
+    dfs(0, n, visited, matriceajd, 1);
+    for (int i = 0; i < n; i++) {
+        if (!visited[i]) {
+            return 0; // Non fortement connexe
+        }
+    }
+
+    return 1; // Fortement connexe
+}
+int dfs_simple(int v, int n, int visited[], double matriceajd[][100]) {
+    visited[v] = 1;
+    for (int i = 0; i < n; i++) {
+        if ((matriceajd[v][i] > 0 || matriceajd[i][v] > 0) && !visited[i]) {
+            dfs_simple(i, n, visited, matriceajd);
+        }
+    }
+    return 0;
+}
+
+int est_connexe_simple(int n, double matriceajd[][100]) {
+    int visited[100] = {0};
+
+    // Effectuer un DFS depuis le sommet 0
+    dfs_simple(0, n, visited, matriceajd);
+
+    // Vérifier si tous les sommets ont été visités
+    for (int i = 0; i < n; i++) {
+        if (!visited[i]) {
+            return 0; // Non connexe
+        }
+    }
+    return 1; // Connexe
+}
+
+void afficher_sommets(int n, char especes[][taille]) {
+    printf("\n=== Liste des animaux du reseau ===\n");
+    for (int i = 0; i < n; i++) {
+        printf("- %s\n", especes[i]);
+    }
+    printf("===================================\n");
+}
+
+void conversion_dot(const char *filename, int n, char especes[][taille], double matriceajd[][100]) {
+    FILE *file = fopen(filename, "w");
+    if (file == NULL) {
+        perror("Erreur lors de la création du fichier DOT");
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(file, "digraph trophic_network {\n");
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            if (matriceajd[i][j] > 0) {
+                fprintf(file, "    \"%s\" -> \"%s\" [label=\"%.1f\"];\n", especes[i], especes[j], matriceajd[i][j]);
+            }
+        }
+    }
+
+    fprintf(file, "}\n");
+    fclose(file);
+    printf("Fichier DOT genere : %s\n", filename);
+}
+// Fonction pour afficher le réseau trophique (les arcs et les poids)
+void afficher_reseau(int n, char especes[][taille], double matriceajd[][100]) {
+    printf("\n=== Reseau trophique (arcs) ===\n");
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            if (matriceajd[i][j] > 0) {
+                printf("%s -> %s (poids: %.1f)\n", especes[i], especes[j], matriceajd[i][j]);
+            }
+        }
+    }
+    printf("===============================\n");
+}
+void afficher_menu(int n, char especes[][taille], double matriceajd[][100], PopulationData *pop_data) {
+    int choix;
+    do {
+        printf("\n=============== MENU ===============\n");
+        printf("1. Afficher les sommets\n");
+        printf("2. Afficher le reseau trophique (les arcs)\n");
+        printf("3. Verifier la connexite\n");
+        printf("4. Demander des renseignements sur un animal\n");
+        printf("5. Simuler le reseau\n");
+        printf("6. Simuler la disparition d'une espece\n");
+        printf("7. Sauvegarder le reseau\n");
+        printf("8. Rechercher un sommet particulier\n");
+        printf("9. Quitter\n");
+        printf("====================================\n");
+        printf("Entrez votre choix : ");
+        scanf("%d", &choix);
+
+        switch (choix) {
+            case 1:
+                system("cls");
+                afficher_sommets(n, especes);
+                break;
+            case 2:
+                system("cls");
+                afficher_reseau(n, especes, matriceajd);
+                break;
+            case 3:
+                system("cls");
+                if (est_connexe_simple(n, matriceajd)) {
+                    printf("Le reseau trophique est connexe.\n");
+                } else {
+                    printf("Le reseau trophique n'est pas connexe.\n");
+                }
+                if (est_fortement_connexe(n, matriceajd)) {
+                    printf("Le reseau trophique est fortement connexe.\n");
+                } else {
+                    printf("Le reseau trophique n'est pas fortement connexe.\n");
+                }
+                break;
+
+            case 4:
+                system("cls");
+                rechercher_animal(n, especes, matriceajd);
+                break;
+            case 5: {
+                system("cls");
+                int iterations;
+                printf("Entrez le nombre d'iterations pour la simulation : ");
+                scanf("%d", &iterations);
+                update_population_dynamics(n, matriceajd, especes, pop_data, iterations);
+                break;
+            }
+            case 6:
+                system("cls");
+                printf("\nOption non implementee pour le moment.\n");
+                break;
+            case 9:
+                system("cls");
+                printf("Au revoir !\n");
+                break;
+            default:
+                system("cls");
+                printf("Option invalide. Veuillez reessayer.\n");
+        }
+    } while (choix != 9);
+}
+
+
+
+int main() {
+    double matriceajd[100][100]; // Matrice d'adjacence avec poids
+
+    int choice;
+    const char *filename;
+    const char *dotname;
+    int n; // Nombre d'espèces
+    PopulationData pop_data;
+    initialize_population_data(12, &pop_data);
+    char especes[100][taille]; // Tableau des noms des espèces
+
+    while (1){
+        // Menu pour choisir le réseau trophique
+        printf("Choisissez le reseau trophique :\n");
+        printf("1. Reseau trophique de la jungle\n");
+        printf("2. Reseau trophique du monde marin\n");
+        printf("3. Reseau trophique de la savane\n");
+        printf("4. Quitter\n");
+
+        printf("Entrez votre choix (1 , 2 , 3, 4) : ");
+        scanf("%d", &choice);
+
+
+        if (choice == 1) {
+            filename = "matricejungle.txt";
+            dotname = "matricejungle.dot";
+            // Lire le graph depuis le fichier
+            lecturetxt(filename, &n, especes, matriceajd);
+            conversion_dot(dotname, n, especes, matriceajd);
+            system("cls");
+            afficher_menu(n, especes, matriceajd,&pop_data);
+
+        } else if (choice == 2) {
+            filename = "matricemondemarin.txt";
+            dotname = "matricemondemarin.dot";
+            lecturetxt(filename, &n, especes, matriceajd);
+            // Afficher le réseau trophique choisi
+            conversion_dot(dotname, n, especes, matriceajd);
+            system("cls");
+            afficher_menu(n, especes, matriceajd,&pop_data);
+
+        }
+        else if (choice == 3){
+            filename = "matricesavane.txt";
+            dotname = "matricesavane.dot";
+            lecturetxt(filename, &n, especes, matriceajd);
+            // Afficher le réseau trophique choisi
+            conversion_dot(dotname, n, especes, matriceajd);
+            system("cls");
+            afficher_menu(n, especes, matriceajd,&pop_data);
+
+
+        }
+        else if (choice == 4) {
+            break;
+        }
+        else {
+            printf("Choix invalide.\n");
+            return 1;
+        }
+
+
+    }
+
+    return 0;
+}
