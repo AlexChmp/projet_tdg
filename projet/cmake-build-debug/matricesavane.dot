@@ -1,0 +1,12 @@
+digraph trophic_network {
+    "Herbe" -> "Charognards" [label="0.3"];
+    "Termites" -> "Herbe" [label="1.0"];
+    "Antilope" -> "Herbe" [label="0.8"];
+    "Charognards" -> "Herbe" [label="0.3"];
+    "Fourmis_soldats" -> "Termites" [label="0.7"];
+    "Rainette" -> "Fourmis_soldats" [label="0.5"];
+    "Python" -> "Antilope" [label="0.3"];
+    "Python" -> "Rainette" [label="0.7"];
+    "Aigle_martial" -> "Python" [label="0.8"];
+    "Lion" -> "Python" [label="0.6"];
+}
